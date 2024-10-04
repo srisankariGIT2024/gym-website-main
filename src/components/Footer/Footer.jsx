@@ -5,8 +5,10 @@ import axios from 'axios';
 
 const Footer = () => {
   const [formData, setFormData] = useState({
-    name: '',
+    firstname: '',
+    lastname: '',
     email: '',
+    mobilenumber: '',
     message: ''
   });
   const [alert, setAlert] = useState({ message: '', type: '' }); // Add alert state
@@ -21,7 +23,7 @@ const Footer = () => {
     try {
       const response = await axios.post('http://localhost:5000/contact', formData);
       console.log(response.data);
-      setAlert({ message: 'Contact saved successfully!', type: 'success' }); // Set success alert
+      setAlert({ message: 'Your enquiry details are submitted successfully! Please check your email for further communication!', type: 'success' }); // Set success alert
       setFormData({ name: '', email: '', message: '' }); // Clear form after submission
       setTimeout(() => setAlert({ message: '', type: '' }), 3000); // Clear alert after 3 seconds
     } catch (error) {
@@ -51,9 +53,18 @@ const Footer = () => {
           <form onSubmit={handleSubmit} className="flex flex-col space-y-4 text-dark">
             <input
               type="text"
-              name="name"
-              placeholder="Name"
-              value={formData.name}
+              name="firstname"
+              placeholder="First Name"
+              value={formData.firstname}
+              onChange={handleChange}
+              required
+              className="border rounded p-2"
+            />
+            <input
+              type="text"
+              name="lastname"
+              placeholder="Last Name"
+              value={formData.lastname}
               onChange={handleChange}
               required
               className="border rounded p-2"
@@ -63,6 +74,15 @@ const Footer = () => {
               name="email"
               placeholder="Email"
               value={formData.email}
+              onChange={handleChange}
+              required
+              className="border rounded p-2"
+            />
+            <input
+              type="text"
+              name="mobilenumber" // Updated here
+              placeholder="Mobile Number"
+              value={formData.mobilenumber}
               onChange={handleChange}
               required
               className="border rounded p-2"
