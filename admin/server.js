@@ -59,8 +59,19 @@ app.post('/contact', async (req, res) => {
   }
 });
 
-// Start the server
+// Handle fetching all contacts
+app.get('/contacts', async (req, res) => {
+  console.log('Received request for contacts');
+  try {
+    const contacts = await Contact.find();
+    res.status(200).json(contacts);
+  } catch (error) {
+    console.error('Error fetching contacts:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
 
+// Start the server
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);
