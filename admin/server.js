@@ -19,6 +19,12 @@ const Contact = mongoose.model('Contact', new mongoose.Schema({
   mobilenumber: { type: String, required: true },
   message: { type: String, required: true },
   createdAt: { type: Date, default: Date.now },
+  enquiryStatus: { type: Number, required: true },
+  reSubmit_count: { type: Number, default: 0 },
+  resSubmit_on: { type: Date, default: Date.now },
+  deleted: { type: Number, required: true },
+  deletedlog: { type: String },
+  deletedOn: { type: Date, default: Date.now },
 }));
 
 // Configure Nodemailer
@@ -34,32 +40,81 @@ const transporter = nodemailer.createTransport({
 
 // Handle contact form submissions
 app.post('/contact', async (req, res) => {
-  const { firstname, lastname, email, mobilenumber, message, createdAt } = req.body;
+  const { firstname, lastname, email, mobilenumber, message, resendLink } = req.body; // Add resendLink to body
+  const enquiryStatus = 0; // Enquiry Status only, not a mentee
+  const deleted = 0; // Active at Enquiry Table
+  const deletedlog = ''; // Default value for deletedlog
+
   try {
-    // Save contact to MongoDB
-    const newContact = new Contact({ firstname, lastname, email, mobilenumber, message, createdAt });
-    await newContact.save();
+    // Check if a contact with the given email or mobile number exists
+    const existingContact = await Contact.findOne({
+      $or: [{ email }, { mobilenumber }]
+    });
 
-    // Set up email data
-    const mailOptions = {
-      from: '"Fitness Center" <sreelogi24@example.com>', // Sender address
-      to: email, // Recipient (user's email)
-      subject: 'Enquiry Details Submitted Successfully', // Subject line
-      text: `Your enquiry details are submitted successfully!\n\nName: ${firstname} ${lastname}\nEmail: ${email}\nMobile Number: ${mobilenumber}\nMessage: ${message}`, // Plain text body
-    };
+    if (existingContact) {
+      // Handle scenarios based on the existing contact's enquiryStatus
+      switch (existingContact.enquiryStatus) {
+        case 0:
+          // Status 0: Increment reSubmit_count and update resSubmit_on
+          existingContact.reSubmit_count = (existingContact.reSubmit_count || 0) + 1;
+          existingContact.resSubmit_on = new Date(); // Update to current time
+          await existingContact.save();
+          return res.status(200).json({ message: 'Enquiry submitted. The mentor will contact you shortly.' });
 
-    // Send the email
-    await transporter.sendMail(mailOptions);
+        case 1:
+          // Status 1: Inform the user that the registration link was already sent
+          if (resendLink) {
+            // Send the registration email again
+            const mailOptions = {
+              from: '"Fitness Center" <sreelogi24@example.com>',
+              to: email,
+              subject: 'Registration Link',
+              text: `You have requested a new registration link. Please use the following link to register: [Registration Link]`,
+            };
+            await transporter.sendMail(mailOptions);
+            return res.status(200).json({ message: 'The registration link has been resent to your email.' });
+          }
+          return res.status(200).json({ message: 'The registration link has already been sent to you. Would you like to resend it?' });
 
-    // Respond to the client
-    res.status(201).json({ message: 'Contact saved and email sent successfully!' });
+        case 2:
+          // Status 2: Provide the link to the dashboard for registered mentees
+          return res.status(200).json({ message: 'You are a registered Mentee. Please use this link: http://localhost:5173/mentees to access your dashboard.' });
+
+        default:
+          return res.status(400).json({ message: 'Unexpected status. Please contact support.' });
+      }
+    } else {
+      // If the contact does not exist, create a new one
+      const newContact = new Contact({
+        firstname,
+        lastname,
+        email,
+        mobilenumber,
+        message,
+        enquiryStatus,
+        deleted,
+        deletedlog,
+      });
+      await newContact.save();
+
+      // Send the registration email
+      const mailOptions = {
+        from: '"Fitness Center" <sreelogi24@example.com>',
+        to: email,
+        subject: 'Enquiry Details Submitted Successfully',
+        text: `Your enquiry details are submitted successfully!\n\nName: ${firstname} ${lastname}\nEmail: ${email}\nMobile Number: ${mobilenumber}\nMessage: ${message}`,
+      };
+
+      await transporter.sendMail(mailOptions);
+      return res.status(201).json({ message: 'Contact saved and email sent successfully!' });
+    }
   } catch (error) {
-    console.error('Error:', error); // Log error details for debugging
-    res.status(400).json({ error: error.message });
+    console.error('Error:', error);
+    return res.status(400).json({ error: error.message });
   }
 });
 
-// Handle fetching all contacts
+
 app.get('/contacts', async (req, res) => {
   console.log('Received request for contacts');
   try {

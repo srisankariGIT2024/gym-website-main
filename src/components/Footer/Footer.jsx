@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import Logo from "../../assets/logo.png";
 import { FaFacebook, FaInstagram, FaLinkedin } from "react-icons/fa";
 import axios from 'axios';
+import ConfirmationModal from './ConfirmationModal'; // Import the modal component
 
 const Footer = () => {
   const [formData, setFormData] = useState({
@@ -11,7 +12,9 @@ const Footer = () => {
     mobilenumber: '',
     message: ''
   });
-  const [alert, setAlert] = useState({ message: '', type: '' }); // Add alert state
+  const [alert, setAlert] = useState({ message: '', type: '' });
+  const [showModal, setShowModal] = useState(false); // State for modal visibility
+  const [resendRequest, setResendRequest] = useState(false); // State to manage resend request
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -23,12 +26,38 @@ const Footer = () => {
     try {
       const response = await axios.post('http://localhost:5000/contact', formData);
       console.log(response.data);
-      setAlert({ message: 'Your enquiry details are submitted successfully! Please check your email for further communication!', type: 'success' }); // Set success alert
-      setFormData({ name: '', email: '', message: '' }); // Clear form after submission
-      setTimeout(() => setAlert({ message: '', type: '' }), 3000); // Clear alert after 3 seconds
+
+      if (response.data.message.includes('resend it')) {
+        setShowModal(true); // Show modal if registration link has already been sent
+        setResendRequest(true); // Indicate that the user may want to resend the link
+      } else {
+        setAlert({ message: response.data.message, type: 'success' });
+      }
+
+      setFormData({ 
+        firstname: '', 
+        lastname: '', 
+        email: '', 
+        mobilenumber: '', 
+        message: '' 
+      }); 
+
+      setTimeout(() => setAlert({ message: '', type: '' }), 3000);
     } catch (error) {
-      console.error("There was an error submitting the form!", error.response ? error.response.data : error.message);
-      setAlert({ message: 'Error submitting the form. Please try again.', type: 'error' }); // Set error alert
+      console.error("There was an error submitting the form!", error?.response?.data || error.message);
+      setAlert({ message: 'Error submitting the form. Please try again.', type: 'error' });
+    }    
+  };
+
+  const handleResend = async () => {
+    try {
+      const resendResponse = await axios.post('http://localhost:5000/contact', { ...formData, resendLink: true });
+      setAlert({ message: resendResponse.data.message, type: 'success' });
+    } catch (error) {
+      console.error("Error resending the link!", error?.response?.data || error.message);
+      setAlert({ message: 'Error resending the link. Please try again.', type: 'error' });
+    } finally {
+      setShowModal(false); // Close modal
     }
   };
 
@@ -80,7 +109,7 @@ const Footer = () => {
             />
             <input
               type="text"
-              name="mobilenumber" // Updated here
+              name="mobilenumber"
               placeholder="Mobile Number"
               value={formData.mobilenumber}
               onChange={handleChange}
@@ -103,6 +132,13 @@ const Footer = () => {
             </button>
           </form>
         </div>
+        {showModal && (
+          <ConfirmationModal
+            message="The registration link has already been sent to you. Would you like to resend it?"
+            onConfirm={handleResend}
+            onCancel={() => setShowModal(false)} // Close the modal on cancel
+          />
+        )}
       </div>
     </div>
   );
