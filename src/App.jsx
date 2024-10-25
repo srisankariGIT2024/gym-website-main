@@ -21,7 +21,7 @@ import Transformation from "./components/Transformation/Transformation";
 import Testimonials from "./components/Testimonials/Testimonials";
 import Footer from "./components/Footer/Footer";
 import Banner2 from "./components/Banner2/Banner2";
-
+import RegistrationForm from './components/Registrationform/Registrationform';
 const App = () => {
   useEffect(() => {
     AOS.init({
@@ -57,6 +57,7 @@ const App = () => {
 
           {/* Mentor Login route */}
           <Route path="/mentor" element={<Mentor />} />
+          <Route path="/register" element={<RegistrationForm />} />
           {/* Mentor Dashboard route */}
           <Route path="/mentordashboard" element={<MentorDashboard />} />
           <Route path="/enquiry" element={<EnquiryinMentorDashboard />} />

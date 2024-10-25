@@ -1,20 +1,20 @@
-import { Disclosure, DisclosureButton, DisclosurePanel, Menu, MenuButton, MenuItem, MenuItems } from '@headlessui/react';
-import { Bars3Icon, BellIcon, XMarkIcon } from '@heroicons/react/24/outline';
-import Logo from "../../assets/logo.png";
-import Badge from './badge';
-import { useEffect, useState } from 'react';
+import { useMemo, useState, useEffect } from 'react';
+import { useTable, usePagination } from 'react-table';
 import axios from 'axios';
+import { Disclosure, Menu, MenuButton } from '@headlessui/react';
+import { BellIcon } from '@heroicons/react/24/outline';
+import Logo from "../../assets/logo.png";
 
 const user = {
     name: 'Tom Cook',
     email: 'tom@example.com',
-    imageUrl: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=facearea&facepad=2&w=256&h=256&q=80',
+    imageUrl: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?ixlib=rb-1.2.1&auto=format&fit=facearea&facepad=2&w=256&h=256&q=80',
 };
 
 const navigation = [
-    { name: 'Dashboard', href: '/mentordashboard', current: false },
+    { name: 'Dashboard', href: '/Enquiry', current: true },
     { name: 'Mentees', href: '/mentees', current: false },
-    { name: 'Enquiry', href: '/enquiry', current: true },
+    { name: 'Enquiry', href: '/enquiry', current: false },
     { name: 'Schedules', href: '#', current: false },
     { name: 'Reports', href: '#', current: false },
 ];
@@ -25,128 +25,136 @@ const userNavigation = [
     { name: 'Sign out', href: '#' },
 ];
 
-function classNames(...classes) {
-    return classes.filter(Boolean).join(' ');
-}
-
-const EnquiryFilters = ({ onFilterChange, selectedFilter, showDeleted, onShowDeletedToggle }) => {
-    const filterOptions = [
-        { label: 'All Enquiries', value: 'all' },
-        { label: 'Enquired', value: '0' },
-        { label: 'Registration Link Sent', value: '1' },
-        { label: 'Registered Mentee', value: '2' },
-        { label: 'Resubmission', value: 'resubmit' },
-    ];
-
-    return (
-        <div className="flex justify-end text-dark p-4">
-            {filterOptions.map(({ label, value }) => (
-                <label key={value} className="mr-4">
-                    <input
-                        type="radio"
-                        name="enquiryFilter"
-                        value={value}
-                        checked={selectedFilter === value}
-                        onChange={() => onFilterChange(value)}
-                        className="mr-1"
-                    />
-                    {label}
-                </label>
-            ))}
-            <label className="mr-4">
-                <input
-                    type="checkbox"
-                    checked={showDeleted}
-                    onChange={onShowDeletedToggle}
-                    className="mr-1"
-                />
-                Show Deleted
-            </label>
-        </div>
-    );
-};
-
-const Enquiry = () => {
-    const [enquiries, setEnquiries] = useState([]);
-    const [filteredEnquiries, setFilteredEnquiries] = useState([]);
-    const [selectedFilter, setSelectedFilter] = useState('0'); // Default filter
-    const [showDeleted, setShowDeleted] = useState(false);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState(null);
+export default function Enquiry() {
+    const [data, setData] = useState([]);
+    const [filters, setFilters] = useState({
+        enquiry: true,
+        resubmission: false,
+        deleted: false,
+    });
 
     useEffect(() => {
-        const fetchEnquiries = async () => {
-            setLoading(true);
+        const fetchData = async () => {
             try {
-                const response = await axios.get('http://localhost:5000/contacts');
-                setEnquiries(response.data);
-                filterEnquiries(response.data);
+                const response = await axios.get('http://localhost:5000/api/enquiries');
+                setData(response.data);
             } catch (error) {
-                console.error('Error fetching enquiries:', error);
-                setError('Failed to load enquiries.');
-            } finally {
-                setLoading(false);
+                console.error('Error fetching data:', error);
             }
         };
-        fetchEnquiries();
+        fetchData();
     }, []);
 
-    useEffect(() => {
-        filterEnquiries(enquiries);
-    }, [selectedFilter, enquiries, showDeleted]);
+    const columns = useMemo(() => [
+        {
+            Header: 'Name',
+            accessor: 'firstname',
+            Cell: ({ row }) => {
+                const { firstname, lastname } = row.original || {};
+                return `${firstname || 'Unknown'} ${lastname || ''}`;
+            },
+        },
+        {
+            Header: 'Email',
+            accessor: 'email',
+        },
+        {
+            Header: 'Mobile Number',
+            accessor: 'mobilenumber',
+        },
+        {
+            Header: 'Enquiry Status',
+            accessor: 'enquiryStatus',
+            Cell: ({ row }) => {
+                const value = row.original.enquiryStatus;
+                const deleted = row.original.deleted;
+                const reSubmitCount = row.original.reSubmit_count || 0;
+                let badgeClass = '';
+                let statusText = '';
 
-    const filterEnquiries = (enquiries) => {
-        const filtered = enquiries.filter(enquiry => {
-            const isDeleted = enquiry.deleted === 1;
+                if (value === 0) {
+                    badgeClass = 'bg-yellow-500';
+                    statusText = 'Enquired';
+                } else if (value === 1) {
+                    badgeClass = 'bg-green-500';
+                    statusText = `Enquired (${reSubmitCount} times)`;
+                } else {
+                    badgeClass = 'bg-red-500';
+                    statusText = 'Deleted';
+                }
 
-            if (showDeleted && isDeleted) return true; // Show deleted if toggled on
+                return (
+                    <span className={`inline-flex items-center px-2 py-1 rounded text-white ${badgeClass}`}>
+                        {statusText}
+                    </span>
+                );
+            },
+        },
+        {
+            Header: 'Created On',
+            accessor: 'createdAt',
+            Cell: ({ value }) => new Date(value).toLocaleString(),
+        },
+        {
+            Header: 'Actions',
+            accessor: 'actions',
+            Cell: () => (
+                <div className="flex space-x-2">
+                    <button className="text-blue-500">Email</button>
+                    <button className="text-yellow-500">Edit</button>
+                    <button className="text-red-500">Delete</button>
+                </div>
+            ),
+        },
+    ], []);
 
-            switch (selectedFilter) {
-                case 'all':
-                    return true;
-                case '0':
-                    return enquiry.enquiryStatus === 0 && enquiry.deleted == 0; // Enquired
-                case '1':
-                    return enquiry.enquiryStatus === 1 && enquiry.deleted == 0;; // Registration Link Sent
-                case '2':
-                    return enquiry.enquiryStatus === 2 && enquiry.deleted == 0; // Registered Mentee
-                case 'resubmit':
-                    return enquiry.reSubmit_count > 0 && enquiry.deleted == 0; // Resubmission
-                case 'delete':
-                    return enquiry.deleted == 1; // Deleted
-                default:
-                    return enquiry.enquiryStatus === 0 && enquiry.deleted == 0; // Enquired
-            }
+    // Apply filters based on selected checkboxes
+    const filteredData = useMemo(() => {
+        return data.filter(item => {
+            const { enquiryStatus, reSubmit_count, deleted } = item;
+            const isEnquiry = filters.enquiry && enquiryStatus === 0 && reSubmit_count === 0 && deleted === 0;
+            const isResubmission = filters.resubmission && enquiryStatus === 1 && reSubmit_count >= 1 && deleted === 0;
+            const isDeleted = filters.deleted && deleted === 1;
+
+            return isEnquiry || isResubmission || isDeleted;
         });
+    }, [data, filters]);
 
-        setFilteredEnquiries(filtered);
-    };
+    const {
+        getTableProps,
+        getTableBodyProps,
+        headerGroups,
+        page,
+        prepareRow,
+        canPreviousPage,
+        canNextPage,
+        gotoPage,
+        nextPage,
+        previousPage,
+        setPageSize,
+        state: { pageIndex, pageSize },
+    } = useTable(
+        {
+            columns,
+            data: filteredData,
+            initialState: { pageIndex: 0 },
+        },
+        usePagination
+    );
 
-    const handleFilterChange = (value) => {
-        setSelectedFilter(value);
-    };
-
-    const toggleShowDeleted = () => {
-        setShowDeleted(prev => !prev);
-    };
-
-    const formatDate = (dateString) => {
-        const options = { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit' };
-        return new Date(dateString).toLocaleDateString(undefined, options);
+    const handleFilterChange = (e) => {
+        const { name, checked } = e.target;
+        setFilters((prevFilters) => ({ ...prevFilters, [name]: checked }));
     };
 
     return (
-        <div className="min-h-full bg-white">
+        <div className="min-h-full">
             <Disclosure as="nav" className="bg-gray-800">
                 <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
                     <div className="flex h-16 items-center justify-between">
                         <div className="flex items-center">
                             <div className="flex-shrink-0">
-                                <img
-                                    alt="Your Company"
-                                    src={Logo}
-                                    className="h-8 w-8"
-                                />
+                                <img alt="Your Company" src={Logo} className="h-8 w-8" />
                             </div>
                             <div className="hidden md:block">
                                 <div className="ml-10 flex items-baseline space-x-4">
@@ -155,10 +163,7 @@ const Enquiry = () => {
                                             key={item.name}
                                             href={item.href}
                                             aria-current={item.current ? 'page' : undefined}
-                                            className={classNames(
-                                                item.current ? 'bg-gray-900 text-white' : 'text-gray-300 hover:bg-gray-700 hover:text-white',
-                                                'rounded-md px-3 py-2 text-sm font-medium',
-                                            )}
+                                            className={`rounded-md px-3 py-2 text-sm font-medium ${item.current ? 'bg-gray-900 text-white' : 'text-gray-300 hover:bg-gray-700 hover:text-white'}`}
                                         >
                                             {item.name}
                                         </a>
@@ -168,172 +173,116 @@ const Enquiry = () => {
                         </div>
                         <div className="hidden md:block">
                             <div className="ml-4 flex items-center md:ml-6">
-                                <button
-                                    type="button"
-                                    className="relative rounded-full bg-gray-800 p-1 text-gray-400 hover:text-white focus:outline-none focus:ring-2 focus:ring-white focus:ring-offset-2 focus:ring-offset-gray-800"
-                                >
-                                    <span className="absolute -inset-1.5" />
+                                <button type="button" className="relative rounded-full bg-gray-800 p-1 text-gray-400 hover:text-white focus:outline-none">
                                     <span className="sr-only">View notifications</span>
                                     <BellIcon aria-hidden="true" className="h-6 w-6" />
                                 </button>
-
-                                {/* Profile dropdown */}
                                 <Menu as="div" className="relative ml-3">
                                     <div>
-                                        <MenuButton className="relative flex max-w-xs items-center rounded-full bg-gray-800 text-sm focus:outline-none focus:ring-2 focus:ring-white focus:ring-offset-2 focus:ring-offset-gray-800">
-                                            <span className="absolute -inset-1.5" />
-                                            <span className="sr-only">Open user menu</span>
+                                        <MenuButton className="relative flex max-w-xs items-center rounded-full bg-gray-800 text-sm focus:outline-none">
                                             <img alt="" src={user.imageUrl} className="h-8 w-8 rounded-full" />
                                         </MenuButton>
                                     </div>
-                                    <MenuItems
-                                        transition
-                                        className="absolute right-0 z-10 mt-2 w-48 origin-top-right rounded-md bg-white py-1 shadow-lg ring-1 ring-black ring-opacity-5 transition focus:outline-none data-[closed]:scale-95 data-[closed]:transform data-[closed]:opacity-0 data-[enter]:duration-100 data-[leave]:duration-75 data-[enter]:ease-out data-[leave]:ease-in"
-                                    >
+                                    <Menu.Items className="absolute right-0 z-10 mt-2 w-48 origin-top-right bg-white py-1 shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none">
                                         {userNavigation.map((item) => (
-                                            <MenuItem key={item.name}>
-                                                <a
-                                                    href={item.href}
-                                                    className="block px-4 py-2 text-sm text-gray-700 data-[focus]:bg-gray-100"
-                                                >
-                                                    {item.name}
-                                                </a>
-                                            </MenuItem>
+                                            <Menu.Item key={item.name}>
+                                                <a href={item.href} className="block px-4 py-2 text-sm text-gray-700">{item.name}</a>
+                                            </Menu.Item>
                                         ))}
-                                    </MenuItems>
+                                    </Menu.Items>
                                 </Menu>
                             </div>
                         </div>
-                        <div className="-mr-2 flex md:hidden">
-                            {/* Mobile menu button */}
-                            <DisclosureButton className="group relative inline-flex items-center justify-center rounded-md bg-gray-800 p-2 text-gray-400 hover:bg-gray-700 hover:text-white focus:outline-none focus:ring-2 focus:ring-white focus:ring-offset-2 focus:ring-offset-gray-800">
-                                <span className="absolute -inset-0.5" />
-                                <span className="sr-only">Open main menu</span>
-                                <Bars3Icon aria-hidden="true" className="block h-6 w-6 group-data-[open]:hidden" />
-                                <XMarkIcon aria-hidden="true" className="hidden h-6 w-6 group-data-[open]:block" />
-                            </DisclosureButton>
-                        </div>
                     </div>
                 </div>
-
-                <DisclosurePanel className="md:hidden">
-                    <div className="space-y-1 px-2 pb-3 pt-2 sm:px-3">
-                        {navigation.map((item) => (
-                            <DisclosureButton
-                                key={item.name}
-                                as="a"
-                                href={item.href}
-                                aria-current={item.current ? 'page' : undefined}
-                                className={classNames(
-                                    item.current ? 'bg-gray-900 text-white' : 'text-gray-300 hover:bg-gray-700 hover:text-white',
-                                    'block rounded-md px-3 py-2 text-base font-medium',
-                                )}
-                            >
-                                {item.name}
-                            </DisclosureButton>
-                        ))}
-                    </div>
-                    <div className="border-t border-gray-700 pb-3 pt-4">
-                        <div className="flex items-center px-5">
-                            <div className="flex-shrink-0">
-                                <img alt="" src={user.imageUrl} className="h-10 w-10 rounded-full" />
-                            </div>
-                            <div className="ml-3">
-                                <div className="text-base font-medium leading-none text-white">{user.name}</div>
-                                <div className="text-sm font-medium leading-none text-gray-400">{user.email}</div>
-                            </div>
-                            <button
-                                type="button"
-                                className="relative ml-auto flex-shrink-0 rounded-full bg-gray-800 p-1 text-gray-400 hover:text-white focus:outline-none focus:ring-2 focus:ring-white focus:ring-offset-2 focus:ring-offset-gray-800"
-                            >
-                                <span className="absolute -inset-1.5" />
-                                <span className="sr-only">View notifications</span>
-                                <BellIcon aria-hidden="true" className="h-6 w-6" />
-                            </button>
-                        </div>
-                        <div className="mt-3 space-y-1 px-2">
-                            {userNavigation.map((item) => (
-                                <DisclosureButton
-                                    key={item.name}
-                                    as="a"
-                                    href={item.href}
-                                    className="block rounded-md px-3 py-2 text-base font-medium text-gray-400 hover:bg-gray-700 hover:text-white"
-                                >
-                                    {item.name}
-                                </DisclosureButton>
-                            ))}
-                        </div>
-                    </div>
-                </DisclosurePanel>
             </Disclosure>
 
             <header className="bg-white shadow">
                 <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
-                    <h1 className="text-3xl font-bold tracking-tight text-gray-900">List of Enquiries</h1>
+                    <h1 className="text-3xl font-bold tracking-tight text-gray-900">Enquiries</h1>
                 </div>
             </header>
-            <EnquiryFilters
-                onFilterChange={handleFilterChange}
-                selectedFilter={selectedFilter}
-                onShowDeletedToggle={toggleShowDeleted}
-                showDeleted={showDeleted}
-            />
-            <div className="min-h-full">
-                <div className="mx-auto max-w-7xl text-dark bg-white px-4 py-6 sm:px-6 lg:px-8">
-                    {loading ? (
-                        <p>Loading...</p>
-                    ) : error ? (
-                        <p className="text-red-500">{error}</p>
-                    ) : (
-                        <>
-                            <div className="flex flex-col mt-6">
-                                <div className="overflow-x-auto sm:-mx-6 lg:-mx-8">
-                                    <div className="inline-block min-w-full py-2 sm:px-6 lg:px-8">
-                                        <div className="overflow-hidden">
-                                            <table className="min-w-full text-left text-sm font-light">
-                                                <thead className="border-b font-medium dark:border-neutral-500">
-                                                    <tr>
-                                                        <th scope="col" className="px-6 py-4">#</th>
-                                                        <th scope="col" className="px-6 py-4">First Name</th>
-                                                        <th scope="col" className="px-6 py-4">Last Name</th>
-                                                        <th scope="col" className="px-6 py-4">Email</th>
-                                                        <th scope="col" className="px-6 py-4">Mobile Number</th>
-                                                        <th scope="col" className="px-6 py-4">Message</th>
-                                                        <th scope="col" className="px-6 py-4">Created On</th>
-                                                        <th scope="col" className="px-6 py-4">Status</th>
-                                                    </tr>
-                                                </thead>
-                                                <tbody>
-                                                    {filteredEnquiries.map((enquiry, index) => (
-                                                        <tr key={enquiry._id} className={`border-b transition duration-300 ease-in-out hover:bg-neutral-100 ${enquiry.deleted === 1 ? 'bg-red-100' : ''}`}>
-                                                            <td className="whitespace-nowrap px-6 py-4 font-medium">{index + 1}</td>
-                                                            <td className="whitespace-nowrap px-6 py-4">{enquiry.firstname}</td>
-                                                            <td className="whitespace-nowrap px-6 py-4">{enquiry.lastname}</td>
-                                                            <td className="whitespace-nowrap px-6 py-4">{enquiry.email}</td>
-                                                            <td className="whitespace-nowrap px-6 py-4">{enquiry.mobilenumber}</td>
-                                                            <td className="whitespace-nowrap px-6 py-4">{enquiry.message}</td>
-                                                            <td className="whitespace-nowrap px-6 py-4">{formatDate(enquiry.createdAt)}</td>
-                                                            <td className="whitespace-nowrap px-6 py-4">
-                                                                {enquiry.deleted === 1 ? (
-                                                                    <span className="text-red-600">Deleted</span>
-                                                                ) : (
-                                                                    <Badge enquiryStatus={enquiry.enquiryStatus} reSubmitCount={enquiry.reSubmit_count} resSubmitOn={enquiry.resSubmit_on} />
-                                                                )}
-                                                            </td>
-                                                        </tr>
-                                                    ))}
-                                                </tbody>
-                                            </table>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </>
-                    )}
+
+            <main>
+                <div className="mx-auto max-w-7xl bg-white px-4 py-6 sm:px-6 lg:px-8">
+                    <div className="flex justify-between items-center mb-4">
+                        <div className="flex items-center">
+                            <label className="mr-2 text-dark">
+                                <input
+                                    type="checkbox"
+                                    name="enquiry"
+                                    checked={filters.enquiry}
+                                    onChange={handleFilterChange}
+                                    className="mr-1 text-dark"
+                                />
+                                Enquired
+                            </label>
+                            <label className="mr-2 text-dark">
+                                <input
+                                    type="checkbox"
+                                    name="resubmission"
+                                    checked={filters.resubmission}
+                                    onChange={handleFilterChange}
+                                    className="mr-1"
+                                />
+                                Resubmission
+                            </label>
+                            <label className="mr-2 text-dark">
+                                <input
+                                    type="checkbox"
+                                    name="deleted"
+                                    checked={filters.deleted}
+                                    onChange={handleFilterChange}
+                                    className="mr-1"
+                                />
+                                Deleted
+                            </label>
+                        </div>
+                        <div className="flex items-center">
+                            <label className="mr-2 text-sm">Show</label>
+                            <select value={pageSize} onChange={e => setPageSize(Number(e.target.value))} className="bg-blue-400 rounded p-2">
+                                {[5, 10, 20, 50].map(size => (
+                                    <option key={size} value={size}>Show {size}</option>
+                                ))}
+                            </select>
+                        </div>
+                    </div>
+
+                    <table {...getTableProps()} className="min-w-full divide-y divide-gray-200 border border-gray-300">
+                        <thead>
+                            {headerGroups.map(headerGroup => (
+                                <tr {...headerGroup.getHeaderGroupProps()}>
+                                    {headerGroup.headers.map(column => (
+                                        <th {...column.getHeaderProps()} className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b border-gray-300">
+                                            {column.render('Header')}
+                                        </th>
+                                    ))}
+                                </tr>
+                            ))}
+                        </thead>
+                        <tbody {...getTableBodyProps()} className="divide-y divide-gray-200">
+                            {page.map(row => {
+                                prepareRow(row);
+                                return (
+                                    <tr {...row.getRowProps()}>
+                                        {row.cells.map(cell => (
+                                            <td {...cell.getCellProps()} className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 border-b border-gray-300">
+                                                {cell.render('Cell')}
+                                            </td>
+                                        ))}
+                                    </tr>
+                                );
+                            })}
+                        </tbody>
+                    </table>
+                    <div className="mt-4 flex items-center justify-end gap-4">
+                        <button onClick={() => gotoPage(0)} disabled={!canPreviousPage} className="p-2 bg-blue-400 rounded">{"<<"}</button>
+                        <button onClick={() => previousPage()} disabled={!canPreviousPage} className="p-2 bg-blue-400 rounded">{"<"}</button>
+                        <button onClick={() => nextPage()} disabled={!canNextPage} className="p-2 bg-blue-400 rounded">{">"}</button>
+                        <button onClick={() => gotoPage(data.length / pageSize - 1)} disabled={!canNextPage} className="p-2 bg-blue-400 rounded">{">>"}</button>
+                    </div>
                 </div>
-            </div>
+            </main>
         </div>
     );
-};
-
-export default Enquiry;
+}

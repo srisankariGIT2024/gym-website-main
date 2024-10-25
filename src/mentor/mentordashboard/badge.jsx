@@ -8,12 +8,12 @@ const Badge = ({ enquiryStatus, reSubmitCount, resSubmitOn }) => {
     };
 
     switch (enquiryStatus) {
-        case 0:
+        case 0: // Enquired
             text = 'Enquired - Sent Registration Link';
             statusClass = 'bg-red-500 text-white';
             break;
-
-        case 1:
+    
+        case 1: // Registration Link Sent
             if (reSubmitCount === 0) {
                 text = 'Registration Link Sent';
                 statusClass = 'bg-yellow-400 text-dark';
@@ -22,30 +22,35 @@ const Badge = ({ enquiryStatus, reSubmitCount, resSubmitOn }) => {
                 statusClass = 'bg-yellow-400 text-dark';
             }
             break;
-
-        case 2:
+    
+        case 2: // Registered Mentee
             text = 'Registered Mentee';
             statusClass = 'bg-green-500 text-white';
             break;
-
-        default:
+    
+        default: // Unknown Status
             text = 'Unknown Status';
             statusClass = 'bg-gray-500 text-white';
             break;
     }
-
     return (
         <span
-            className={`inline-flex flex-col items-start px-3 py-1 rounded-full text-sm font-medium ${statusClass}`}
-            style={{ whiteSpace: 'normal', lineHeight: '1.1' }}
-        >
-            {text}
-            {enquiryStatus === 1 && reSubmitCount > 0 && (
-                <span className="text-xs mt-1">
-                    {`done on ${formatDate(resSubmitOn)}`}
-                </span>
-            )}
-        </span>
+        className={`inline-flex flex-col items-start px-3 py-1 rounded-full text-sm font-medium ${statusClass}`}
+        style={{ whiteSpace: 'normal', lineHeight: '1.1' }}
+    >
+        {text}
+        {enquiryStatus === 1 && reSubmitCount > 0 && (
+            <span className="text-xs mt-1">
+                {`done on ${formatDate(resSubmitOn)}`}
+            </span>
+        )}
+        {enquiryStatus === 0 && reSubmitCount === 1 && (
+            <span className="text-xs mt-1">
+                {`Re-enquired once`}
+            </span>
+        )}
+    </span>
+    
     );
 };
 
